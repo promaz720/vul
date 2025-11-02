@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Scan Report - {{ target_url }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; background: #f5f7fa; color: #1a1a1a; }
+      h1, h2, h3 { color: #0f172a; }
+      .meta { margin-bottom: 1.5rem; }
+      .finding { border: 1px solid #d4d4d8; border-left-width: 8px; padding: 1rem; margin-bottom: 1rem; background: #fff; }
+      .finding-high { border-left-color: #dc2626; }
+      .finding-medium { border-left-color: #f97316; }
+      .finding-low { border-left-color: #22c55e; }
+      pre { background: #0f172a; color: #f8fafc; padding: 1rem; overflow-x: auto; }
+      .small { font-size: 0.9rem; color: #475569; }
+    </style>
+  </head>
+  <body>
+    <h1>Scan Report</h1>
+    <div class="meta">
+      <p><strong>Target:</strong> {{ target_url }}</p>
+      <p><strong>Scan ID:</strong> {{ report_id }}</p>
+      <p><strong>Generated:</strong> {{ scanned_at.strftime('%Y-%m-%d %H:%M:%SZ') }}</p>
+    </div>
+
+    <h2>Executive Summary</h2>
+    <p>Automated scan completed with {{ scan_result.findings|length }} findings. Review each item and validate manually.</p>
+
+    <h2>Findings</h2>
+    {% if scan_result.findings %}
+      {% for finding in scan_result.findings %}
+        <div class="finding finding-{{ finding.severity|lower }}">
+          <h3>{{ finding.title }} ({{ finding.severity }})</h3>
+          <p>{{ finding.description }}</p>
+          <p><strong>Recommendation:</strong> {{ finding.recommendation }}</p>
+          {% if finding.path %}
+            <p><strong>Path:</strong> {{ finding.path }}</p>
+          {% endif %}
+          {% if finding.poc %}
+            <p><strong>Proof of Concept:</strong> {{ finding.poc }}</p>
+          {% endif %}
+          {% if finding.evidence %}
+            <h4>Evidence</h4>
+            <pre>{{ finding.evidence | tojson(indent=2) }}</pre>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No issues detected with the current checks.</p>
+    {% endif %}
+
+    <h2>Metadata</h2>
+    <pre>{{ scan_result.metadata | tojson(indent=2) }}</pre>
+
+    <p class="small">Use responsibly. This tool is designed for authorized assessments and educational demonstrations only.</p>
+  </body>
+</html>

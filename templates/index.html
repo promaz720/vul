@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="card">
+    <form method="post" class="scan-form" id="scanForm">
+      <label for="target_url">Target URL</label>
+      <input id="target_url" name="target_url" type="url" placeholder="https://example.com" required value="{{ target_url or '' }}">
+      <button type="submit" id="scanButton">Run Scan</button>
+    </form>
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% endif %}
+  </section>
+
+  <!-- Loading Spinner -->
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p class="loading-text">Scanning target...</p>
+    </div>
+  </div>
+
+  {% if scan_result %}
+    <section class="card">
+      <h2>Scan Summary</h2>
+      <p><strong>Target:</strong> {{ scan_result.target }}</p>
+      <p><strong>Findings:</strong> {{ scan_result.findings|length }}</p>
+      <p><strong>Status Code:</strong> {{ scan_result.metadata.status_code if scan_result.metadata else 'N/A' }}</p>
+      <p><strong>Report:</strong> <a href="{{ url_for('download_report', report_id=report_id) }}">Download HTML report</a></p>
+      
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <form method="post" action="{{ url_for('refresh_scan') }}" style="display:inline;">
+          <button type="submit" class="btn-refresh">📝 New Scan</button>
+        </form>
+        <form method="post" action="{{ url_for('clear_cache') }}" style="display:inline;">
+          <button type="submit" class="btn-clear">🔄 Clear Cache & Scan</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Findings</h3>
+      {% if scan_result.findings %}
+        <ul class="findings">
+          {% for finding in scan_result.findings %}
+            <li class="finding finding-{{ finding.severity|lower }}">
+              <h4>{{ finding.title }} <span class="badge">{{ finding.severity }}</span></h4>
+              <p>{{ finding.description }}</p>
+              <p><strong>Recommendation:</strong> {{ finding.recommendation }}</p>
+              {% if finding.evidence %}
+                <details>
+                  <summary>Evidence</summary>
+                  <pre>{{ finding.evidence | tojson(indent=2) }}</pre>
+                </details>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No issues detected with the current checks.</p>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <section class="card disclaimer">
+    <h3>Disclaimer</h3>
+    <p>This scanner performs a limited set of passive checks. It does not replace a full penetration test and should only be used on systems you are authorized to assess.</p>
+  </section>
+
+  <script>
+    document.getElementById('scanForm').addEventListener('submit', function() {
+      document.getElementById('loadingOverlay').style.display = 'flex';
+      document.getElementById('scanButton').disabled = true;
+    });
+  </script>
+{% endblock %}

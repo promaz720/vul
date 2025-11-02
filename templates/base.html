@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vulnerability Scanner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Vulnerability Scanner</h1>
+      <p class="subtitle">Educational tool for quick surface-level checks</p>
+    </header>
+
+    <main class="app-main">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <section class="flash">
+            {% for message in messages %}
+              <p>{{ message }}</p>
+            {% endfor %}
+          </section>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer">
+      <p>&copy; {{ now.year }} Vuln Scanner Demo. For research and educational use only.</p>
+    </footer>
+  </body>
+</html>
