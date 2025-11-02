@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify
 from pathlib import Path
 from datetime import datetime
 import uuid
@@ -12,6 +12,12 @@ app.config["REPORT_DIR"].mkdir(parents=True, exist_ok=True)
 
 # Cache for recent scans to avoid re-scanning same URLs
 scan_cache = {}
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint for Render"""
+    return jsonify({"status": "healthy"}), 200
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -80,6 +86,16 @@ def clear_cache():
 def inject_now():
     # Expose current UTC time to templates when needed.
     return {"now": datetime.utcnow()}
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template("error.html", error="Internal Server Error", code=500), 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return render_template("error.html", error="Page Not Found", code=404), 404
 
 
 if __name__ == "__main__":

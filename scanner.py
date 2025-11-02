@@ -6,10 +6,16 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urljoin, urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import warnings
 
 import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+
+# Suppress SSL warnings for self-signed certificates
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
+urllib3_logger = __import__('logging').getLogger('urllib3')
+urllib3_logger.setLevel(__import__('logging').CRITICAL)
 
 # User agents to bypass basic bot detection
 USER_AGENTS = [
