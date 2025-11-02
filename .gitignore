@@ -45,3 +45,4 @@ static/reports/
 # Flask
 instance/
 .webassets-cache
+.vercel
