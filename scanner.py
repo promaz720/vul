@@ -11,6 +11,25 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+# User agents to bypass basic bot detection
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Mobile/15E148 Safari/604.1",
+]
+
+HEADERS = {
+    "User-Agent": USER_AGENTS[0],
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1"
+}
+
 REQUEST_TIMEOUT = 5  # Reduced from 8
 MAX_CRAWL_PAGES = 5  # Reduced from 10 for faster crawling
 MAX_URL_SCAN = 5  # Reduced from 10
@@ -43,14 +62,50 @@ def run_scans(target_url: str) -> ScanResult:
     metadata = {}
 
     try:
-        response = requests.get(normalized_url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
+        response = requests.get(
+            normalized_url, 
+            timeout=REQUEST_TIMEOUT, 
+            allow_redirects=True,
+            headers=HEADERS,
+            verify=False
+        )
         response.raise_for_status()
+    except requests.exceptions.Timeout:
+        findings.append(
+            Finding(
+                title="Request Timeout",
+                severity="Medium",
+                description=f"The request to {normalized_url} timed out after {REQUEST_TIMEOUT} seconds.",
+                recommendation="The target may be slow or unresponsive. Try again later or increase timeout.",
+            )
+        )
+        return ScanResult(target=normalized_url, findings=findings, metadata=metadata)
+    except requests.exceptions.ConnectionError as e:
+        findings.append(
+            Finding(
+                title="Connection Error",
+                severity="High",
+                description=f"Could not connect to {normalized_url}. Error: {str(e)[:100]}",
+                recommendation="Verify the URL is correct and the host is online.",
+            )
+        )
+        return ScanResult(target=normalized_url, findings=findings, metadata=metadata)
+    except requests.exceptions.HTTPError as e:
+        findings.append(
+            Finding(
+                title=f"HTTP Error {e.response.status_code}",
+                severity="High" if e.response.status_code >= 500 else "Medium",
+                description=f"Server returned {e.response.status_code}: {e.response.reason}",
+                recommendation="Check if the URL is correct or if the server is properly configured.",
+            )
+        )
+        return ScanResult(target=normalized_url, findings=findings, metadata=metadata)
     except Exception as exc:  # Broad catch to include connection issues.
         findings.append(
             Finding(
                 title="Target Unreachable",
                 severity="High",
-                description=f"Could not reach {normalized_url}. {exc}",
+                description=f"Could not reach {normalized_url}. {str(exc)[:100]}",
                 recommendation="Verify that the host is online and reachable from the scanner.",
             )
         )
@@ -170,7 +225,7 @@ def check_https_usage(url: str) -> List[Finding]:
 def check_robots_disclosure(url: str) -> List[Finding]:
     robots_url = urljoin(url if url.endswith("/") else url + "/", "robots.txt")
     try:
-        response = requests.get(robots_url, timeout=REQUEST_TIMEOUT)
+        response = requests.get(robots_url, timeout=REQUEST_TIMEOUT, headers=HEADERS, verify=False)
     except Exception:
         return []
 
@@ -207,7 +262,7 @@ def crawl_site(base_url: str, max_pages: int = 10) -> Dict[str, Any]:
             continue
         visited.add(url)
         try:
-            response = requests.get(url, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, timeout=REQUEST_TIMEOUT, headers=HEADERS, verify=False)
             if response.status_code != 200:
                 continue
             soup = BeautifulSoup(response.content, 'html.parser')  # Faster than lxml
@@ -238,7 +293,7 @@ def check_sql_injection(url: str, param_name: str = "q") -> List[Finding]:
     for payload in SQL_PAYLOADS:
         params = {param_name: payload}
         try:
-            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT, headers=HEADERS, verify=False)
         except Exception:
             continue
         if any(keyword in response.text.lower() for keyword in ("sql syntax", "sql error", "database error")):
@@ -261,7 +316,7 @@ def check_reflected_xss(url: str, param_name: str = "xss") -> List[Finding]:
     findings: List[Finding] = []
     for payload in XSS_PAYLOADS:
         try:
-            response = requests.get(url, params={param_name: payload}, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, params={param_name: payload}, timeout=REQUEST_TIMEOUT, headers=HEADERS, verify=False)
         except Exception:
             continue
 
@@ -286,7 +341,7 @@ def check_command_injection(url: str, param_name: str = "cmd") -> List[Finding]:
     for payload in COMMAND_INJ_PAYLOADS:
         params = {param_name: payload}
         try:
-            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT, headers=HEADERS, verify=False)
         except Exception:
             continue
         if ("root:" in response.text or "/bin/bash" in response.text or "command not found" not in response.text and len(response.text.split('\n')) > 1):
@@ -310,7 +365,7 @@ def check_path_traversal(url: str, param_name: str = "file") -> List[Finding]:
     for payload in PATH_TRAVERSAL_PAYLOADS:
         params = {param_name: payload}
         try:
-            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT, headers=HEADERS, verify=False)
         except Exception:
             continue
         if "root:" in response.text or "[boot loader]" in response.text or any(keyword in response.text for keyword in ["passwd", "etc"]):
